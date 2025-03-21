@@ -156,3 +156,45 @@ exports.loginUser = async (req, res) => {
   }
 };
 
+exports.logout = async (req, res) => {
+  try {
+      const refreshToken = req.cookies["refresh-token"]; // Lấy refresh-token từ cookie
+      if (!refreshToken) {
+          return res.status(401).json({
+              title: "Lỗi",
+              message: "Không tìm thấy refresh token",
+          });
+      }
+
+      // Tìm người dùng dựa trên refresh token
+      const user = await User.findOne({ token: refreshToken });
+      if (!user) {
+          return res.status(401).json({
+              title: "Lỗi",
+              message: "Token không hợp lệ hoặc người dùng không tồn tại",
+          });
+      }
+
+      // Xóa refresh token khỏi danh sách token
+      const updatedTokens = user.token.filter((item) => item !== refreshToken);
+      await User.findByIdAndUpdate(user._id, { token: updatedTokens });
+
+      // Xóa cookie trên trình duyệt
+      res.clearCookie("refresh-token", {
+          httpOnly: true,
+          secure: true,
+          sameSite: "strict",
+      });
+
+      return res.status(200).json({
+          message: "Đăng xuất thành công",
+      });
+  } catch (error) {
+      res.status(500).json({
+          message: "Lỗi máy chủ",
+          error: error.message,
+      });
+  }
+};
+
+
