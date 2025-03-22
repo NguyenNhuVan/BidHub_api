@@ -197,4 +197,53 @@ exports.logout = async (req, res) => {
   }
 };
 
+exports.changePassword = async (req, res) => {
+  try {
+
+      if (!req.body.password || !req.body.newPassword || !req.body.confirmPassword) {
+      return res.status(400).json({
+          title: "Lỗi",
+          message: "Vui lòng cung cấp mật khẩu cũ, mật khẩu mới và xác nhận mật khẩu.",
+      });
+  }
+      const { password, newPassword, confirmPassword } = req.body;
+      const { _id } = req.user;
+
+      if (newPassword !== confirmPassword) {
+          return res.status(400).json({
+              title: "Lỗi",
+              message: "Mật khẩu mới và xác nhận mật khẩu không khớp",
+          });
+      }
+
+      const user = await User.findById(_id);
+      if (!user) {
+          return res.status(404).json({
+              title: "Lỗi",
+              message: "Người dùng không tồn tại",
+          });
+      }
+
+      const isMatchPW = await bcrypt.compare(password, user.password);
+      if (!isMatchPW) {
+          return res.status(401).json({
+              title: "Lỗi",
+              message: "Mật khẩu cũ không đúng",
+          });
+      }
+      const newHashPass = await bcrypt.hash(newPassword, saltRounds);
+      await User.findByIdAndUpdate(_id, { password: newHashPass });
+      res.status(200).json({
+          title: "Thành công",
+          message: "Đổi mật khẩu thành công",
+      });
+  } catch (error) {
+      res.status(500).json({
+          title: "Lỗi",
+          message: "Lỗi máy chủ",
+          error: error.message,
+      });
+  }
+};
+
 
