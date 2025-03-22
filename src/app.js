@@ -5,15 +5,17 @@ const path = require("path");
 const Routes = require("./routes/index.js");
 const connectDB = require("./config/database.js");
 const cookieParser = require('cookie-parser');
+const bodyParser = require('body-parser');
 
-
-var app = express();
+const app = express();
+Routes(app);
 const server = http.createServer(app);
 app.use(express.json());
+app.use(bodyParser.json()) 
+app.use(bodyParser.urlencoded({ extended: true }))
 app.use(cookieParser());
 
 
-Routes(app);
 
 
 
