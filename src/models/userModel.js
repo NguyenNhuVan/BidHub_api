@@ -7,9 +7,7 @@ const userSchema = new mongoose.Schema({
   role_id: {
       type: String, 
       default: 'user', 
-  },
-  created_at: { type: Date, default: Date.now },
-  updated_at: { type: Date, default: Date.now },
+  }
 });
 
 module.exports = mongoose.model('User', userSchema);

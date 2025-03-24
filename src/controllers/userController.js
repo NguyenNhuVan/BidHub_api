@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const { generateAccessToken, generateRefreshToken } = require('../utils/generationToken');
 const User = require('../models/userModel');
 const { isEmail, checkPassword } = require('../utils/validation');
+const { sendResetPasswordEmail } = require('../utils/emailService');
 const saltRounds = 10;
 
 
@@ -245,5 +246,18 @@ exports.changePassword = async (req, res) => {
       });
   }
 };
+exports.resetPasswordController = async (req, res) => {
+  const { email } = req.body;
 
+  try {
+      // Tạo link reset password (ở đây dùng link giả)
+      const resetLink = `http://yourwebsite.com/reset-password?email=${email}`;
 
+      // Gửi email
+      await sendResetPasswordEmail(email, resetLink);
+
+      res.status(200).json({ message: 'Email đặt lại mật khẩu đã được gửi!' });
+  } catch (error) {
+      res.status(500).json({ message: 'Đã xảy ra lỗi khi gửi email!' });
+  }
+};
