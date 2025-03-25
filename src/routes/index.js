@@ -1,7 +1,8 @@
-const userRoutes = require('./userRoutes');
-
+const userRoute = require('./userRoutes');
+const categoryRoute = require('./userRoutes');
 
 module.exports = (app) => {
-    app.use("/accounts", userRoutes);
+    app.use("/accounts", userRoute);
+    app.use("/category", categoryRoute);
    
 }

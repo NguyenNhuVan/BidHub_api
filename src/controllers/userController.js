@@ -89,8 +89,7 @@ exports.registerUser = async (req, res) => {
     const { name, email, role_id, _id } = newUser;
 
     return res.status(200).json({
-      user: { _id, name, email, role_id },
-      token: accessToken,
+      user: { _id, name, email, role_id }
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -99,6 +98,7 @@ exports.registerUser = async (req, res) => {
 
 
 exports.loginUser = async (req, res) => {
+  console.log(req.body);
   const { email, password } = req.body;
 
   // Kiểm tra email và mật khẩu
@@ -159,7 +159,7 @@ exports.loginUser = async (req, res) => {
 
 exports.logout = async (req, res) => {
   try {
-      const refreshToken = req.cookies["refresh-token"]; // Lấy refresh-token từ cookie
+      const refreshToken = req.cookies["refresh-token"]; 
       if (!refreshToken) {
           return res.status(401).json({
               title: "Lỗi",
@@ -247,9 +247,14 @@ exports.changePassword = async (req, res) => {
   }
 };
 exports.resetPasswordController = async (req, res) => {
+  console.log(req.body);
   const { email } = req.body;
 
   try {
+    const user = await User.findOne({ email });
+    if(user == null){
+      res.status(404).json({ message: 'Email không tồn tại!' });
+    }
       // Tạo link reset password (ở đây dùng link giả)
       const resetLink = `http://yourwebsite.com/reset-password?email=${email}`;
 
