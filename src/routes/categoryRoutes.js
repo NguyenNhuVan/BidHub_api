@@ -16,3 +16,5 @@ router.put("/updateCategory/:id", CategoryController.updateCategory);
 
 // Xóa danh mục
 router.delete("/deleteCategory/:id", CategoryController.deleteCategory);
+
+module.exports = router;

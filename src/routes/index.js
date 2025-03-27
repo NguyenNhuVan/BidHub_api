@@ -1,8 +1,7 @@
 const userRoute = require('./userRoutes');
-const categoryRoute = require('./userRoutes');
+const roleRoute = require('./roleRoutes');
 
 module.exports = (app) => {
     app.use("/accounts", userRoute);
-    app.use("/category", categoryRoute);
-   
-}
+    app.use("/role",roleRoute);
+};
