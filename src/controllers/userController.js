@@ -2,9 +2,8 @@ const bcrypt = require('bcrypt');
 const { generateAccessToken, generateRefreshToken } = require('../utils/generationToken');
 const User = require('../models/userModel');
 const { isEmail, checkPassword } = require('../utils/validation');
-const { sendResetPasswordEmail } = require('../utils/emailService');
+const { sendResetPasswordEmail,generateResetToken } = require('../utils/emailService');
 const saltRounds = 10;
-
 
 
 
@@ -159,42 +158,20 @@ exports.loginUser = async (req, res) => {
 
 exports.logout = async (req, res) => {
   try {
-      const refreshToken = req.cookies["refresh-token"]; 
-      if (!refreshToken) {
-          return res.status(401).json({
-              title: "Lỗi",
-              message: "Không tìm thấy refresh token",
-          });
+      // Đảm bảo rằng người dùng đang đăng nhập bằng token
+      const token = req.headers.authorization?.split(' ')[1];
+      if (!token) {
+          return res.status(401).json({ message: 'Bạn chưa đăng nhập!' });
       }
 
-      // Tìm người dùng dựa trên refresh token
-      const user = await User.findOne({ token: refreshToken });
-      if (!user) {
-          return res.status(401).json({
-              title: "Lỗi",
-              message: "Token không hợp lệ hoặc người dùng không tồn tại",
-          });
-      }
+      // Hủy token trên server bằng cách đưa token vào danh sách "blacklist" (tùy chọn)
+      // Hoặc đơn giản để token hết hạn mà không cần thao tác gì trên server
 
-      // Xóa refresh token khỏi danh sách token
-      const updatedTokens = user.token.filter((item) => item !== refreshToken);
-      await User.findByIdAndUpdate(user._id, { token: updatedTokens });
-
-      // Xóa cookie trên trình duyệt
-      res.clearCookie("refresh-token", {
-          httpOnly: true,
-          secure: true,
-          sameSite: "strict",
-      });
-
-      return res.status(200).json({
-          message: "Đăng xuất thành công",
-      });
+      // Gửi phản hồi thành công
+      res.status(200).json({ message: 'Đăng xuất thành công!' });
   } catch (error) {
-      res.status(500).json({
-          message: "Lỗi máy chủ",
-          error: error.message,
-      });
+      console.error('Error during logout:', error);
+      res.status(500).json({ message: 'Đã xảy ra lỗi khi đăng xuất!' });
   }
 };
 
@@ -247,54 +224,59 @@ exports.changePassword = async (req, res) => {
   }
 };
 exports.forgotPassword = async (req, res) => {
-  console.log(req.body);
   const { email } = req.body;
 
   try {
-    const user = await User.findOne({ email });
-    if(user == null){
-      res.status(404).json({ message: 'Email không tồn tại!' });
-    }
-      // Tạo link reset password (ở đây dùng link giả)
-      const resetLink = `http://localhost:3001/accounts/activate-password?email=${email}`;
+      const user = await User.findOne({ email });
+      if (!user) {
+          return res.status(404).json({ message: 'Email không tồn tại!' });
+      }
 
-      // Gửi email
+      const resetToken = generateResetToken();
+      console.log('Generated reset token:', resetToken);
+      user.resetPasswordToken = resetToken;
+      user.resetPasswordExpires = Date.now() + 3600000;
+      await user.save();
+      console.log('User after saving token:', user);
+
+
+      const resetLink = `http://localhost:3001/accounts/activate-password?token=${resetToken}`;
+
+
       await sendResetPasswordEmail(email, resetLink);
 
       res.status(200).json({ message: 'Email đặt lại mật khẩu đã được gửi!' });
   } catch (error) {
+      console.error('Error sending reset password email:', error);
       res.status(500).json({ message: 'Đã xảy ra lỗi khi gửi email!' });
   }
 };
 exports.activateNewPassword = async (req, res) => {
-  const { email } = req.query;
+  const { token, newPassword } = req.query;
+  console.log('Token nhận được:', req.query);
 
-  try {
-      // Tìm người dùng theo email
-      const user = await User.findOne({ email });
-      if (!user) {
-          return res.status(404).json({ message: 'Người dùng không tồn tại!' });
-      }
+    try {
+        const user = await User.findOne({
+            resetPasswordToken: token,
+            resetPasswordExpires: { $gt: Date.now() },
+        });
+        
+        if (!user) {
+            return res.status(400).json({ message: 'Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn!' });
+        }
 
-      // Kiểm tra xem người dùng đã nhận mật khẩu mới chưa
-      const newPassword = req.query.newPassword;
-      if (!newPassword) {
-          return res.status(400).json({ message: 'Mật khẩu mới không hợp lệ!' });
-      }
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+        await user.save();
 
-      // Hash mật khẩu mới
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-      // Cập nhật mật khẩu mới vào database
-      user.password = hashedPassword;
-      await user.save();
-
-      res.status(200).json({ message: 'Mật khẩu của bạn đã được kích hoạt thành công!' });
-  } catch (error) {
-      console.error('Error activating password:', error);
-      res.status(500).json({ message: 'Đã xảy ra lỗi khi kích hoạt mật khẩu!' });
-  }
-}
+        res.status(200).json({ message: 'Mật khẩu của bạn đã được đặt lại thành công!' });
+    } catch (error) {
+        console.error('Error resetting password:', error);
+        res.status(500).json({ message: 'Đã xảy ra lỗi khi đặt lại mật khẩu!' });
+    }
+};
 exports.validateUserProfile = (req, res, next) => {
   const user = req.user; // Lấy thông tin người dùng từ middleware xác thực
   

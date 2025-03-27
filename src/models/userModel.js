@@ -16,6 +16,8 @@ const userSchema = new mongoose.Schema({
   id_proof: { type: String },
   payment_methods: { type: Array, default: [] },
   balance: { type: Number, default: 0 },
+  resetPasswordToken :{type: String},
+  resetPasswordExpires:{ type: String },
   social_links: {
     facebook: { type: String },
     twitter: { type: String },

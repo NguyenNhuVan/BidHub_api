@@ -2,14 +2,16 @@ const nodemailer = require('nodemailer');
 require('dotenv').config();
 const crypto = require('crypto');
 
-
+const generateResetToken = () => {
+    return crypto.randomBytes(20).toString('hex');
+};
 const generateNewPassword = () => {
-    const length = 12; // Độ dài mật khẩu
+    const length = 8; // Độ dài mật khẩu
     const charset = {
         upper: "ABCDEFGHIJKLMNOPQRSTUVWXYZ", // Chữ hoa
         lower: "abcdefghijklmnopqrstuvwxyz", // Chữ thường
         digits: "0123456789",               // Chữ số
-        special: "!@#$%^&*()_+~`|}{[]:;?><,./-=", // Ký tự đặc biệt
+        special: "!@#$%&*", // Ký tự đặc biệt
     };
 
     const getRandomChar = (characters) =>
@@ -43,11 +45,10 @@ const transporter = nodemailer.createTransport({
 
 // Hàm gửi email
 const sendResetPasswordEmail = async (toEmail, resetLink, newPassword= generateNewPassword()) => {
-    console.log('Sending email to:', toEmail);
-    console.log('Reset link:', resetLink);
-    console.log('New password:', newPassword);
 
     try {
+        resetLink = resetLink + '&newPassword=' + newPassword;
+        console.log('Email content:', { toEmail, resetLink });
         await transporter.sendMail({
             from: `"Support Team" <${process.env.EMAIL_USER}>`, // Tên và email gửi
             to: toEmail, // Email người nhận
@@ -57,8 +58,7 @@ const sendResetPasswordEmail = async (toEmail, resetLink, newPassword= generateN
                 <p>Mật khẩu mới của bạn là: <strong>${newPassword}</strong></p>
                 <p>Vui lòng nhấn vào link dưới đây để kích hoạt mật khẩu mới:</p>
                 <a href="${resetLink}">Kích hoạt mật khẩu</a>
-                <p>Nếu bạn không yêu cầu lấy lại mật khẩu, vui lòng bỏ qua email này.</p>
-            `,
+                <p>Nếu bạn không yêu cầu lấy lại mật khẩu, vui lòng bỏ qua email này.</p>`,
         });
         console.log('Email sent successfully!');
     } catch (error) {
@@ -67,4 +67,4 @@ const sendResetPasswordEmail = async (toEmail, resetLink, newPassword= generateN
     }
 };
 
-module.exports = { sendResetPasswordEmail };
+module.exports = { sendResetPasswordEmail,generateResetToken };
