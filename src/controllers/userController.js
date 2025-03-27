@@ -246,7 +246,7 @@ exports.changePassword = async (req, res) => {
       });
   }
 };
-exports.resetPasswordController = async (req, res) => {
+exports.forgotPassword = async (req, res) => {
   console.log(req.body);
   const { email } = req.body;
 
@@ -256,7 +256,7 @@ exports.resetPasswordController = async (req, res) => {
       res.status(404).json({ message: 'Email không tồn tại!' });
     }
       // Tạo link reset password (ở đây dùng link giả)
-      const resetLink = `http://yourwebsite.com/reset-password?email=${email}`;
+      const resetLink = `http://localhost:3001/accounts/activate-password?email=${email}`;
 
       // Gửi email
       await sendResetPasswordEmail(email, resetLink);
@@ -266,3 +266,130 @@ exports.resetPasswordController = async (req, res) => {
       res.status(500).json({ message: 'Đã xảy ra lỗi khi gửi email!' });
   }
 };
+exports.activateNewPassword = async (req, res) => {
+  const { email } = req.query;
+
+  try {
+      // Tìm người dùng theo email
+      const user = await User.findOne({ email });
+      if (!user) {
+          return res.status(404).json({ message: 'Người dùng không tồn tại!' });
+      }
+
+      // Kiểm tra xem người dùng đã nhận mật khẩu mới chưa
+      const newPassword = req.query.newPassword;
+      if (!newPassword) {
+          return res.status(400).json({ message: 'Mật khẩu mới không hợp lệ!' });
+      }
+
+      // Hash mật khẩu mới
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Cập nhật mật khẩu mới vào database
+      user.password = hashedPassword;
+      await user.save();
+
+      res.status(200).json({ message: 'Mật khẩu của bạn đã được kích hoạt thành công!' });
+  } catch (error) {
+      console.error('Error activating password:', error);
+      res.status(500).json({ message: 'Đã xảy ra lỗi khi kích hoạt mật khẩu!' });
+  }
+}
+exports.validateUserProfile = (req, res, next) => {
+  const user = req.user; // Lấy thông tin người dùng từ middleware xác thực
+  
+  if (!user) {
+    return res.status(401).json({ message: "Người dùng chưa đăng nhập" });
+  }
+
+  // Kiểm tra các trường bắt buộc
+  const { name, email, address, phone, dob } = user;
+
+  if (!name || !email || !address || !phone || !dob) {
+    return res.status(400).json({
+      message: "Vui lòng cập nhật đầy đủ thông tin cá nhân trước khi tiếp tục",
+      missingFields: {
+        name: !name ? "Tên" : null,
+        email: !email ? "Email" : null,
+        address: !address ? "Địa chỉ" : null,
+        phone: !phone ? "Số điện thoại" : null,
+        dob: !dob ? "Ngày sinh" : null,
+      },
+    });
+  }
+
+  // Nếu đầy đủ thông tin
+  next();
+};
+exports.updateProfile = async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      phone,
+      address,
+      dob,
+      avatar,
+      social_links,
+      id_proof,
+    } = req.body; // Các trường cần cập nhật
+    const userId = req.user._id; // Lấy ID người dùng từ middleware xác thực
+
+    // Kiểm tra xem email có thay đổi không
+    if (email) {
+      const emailExists = await User.findOne({ email, _id: { $ne: userId } });
+      if (emailExists) {
+        return res.status(400).json({
+          message: "Email đã được sử dụng bởi người dùng khác",
+        });
+      }
+    }
+
+    // Xây dựng đối tượng cập nhật
+    const updateFields = {};
+    if (name) updateFields.name = name;
+    if (email) updateFields.email = email;
+    if (phone) updateFields.phone = phone;
+    if (address) updateFields.address = address;
+    if (dob) updateFields.dob = dob;
+    if (avatar) updateFields.avatar = avatar;
+    if (social_links) updateFields.social_links = social_links;
+    if (id_proof) updateFields.id_proof = id_proof;
+
+    // Cập nhật thông tin người dùng
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        message: "Không tìm thấy người dùng",
+      });
+    }
+
+    // Trả về thông tin cập nhật
+    res.status(200).json({
+      message: "Cập nhật hồ sơ thành công",
+      user: {
+        _id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        address: updatedUser.address,
+        dob: updatedUser.dob,
+        avatar: updatedUser.avatar,
+        social_links: updatedUser.social_links,
+        id_proof: updatedUser.id_proof,
+        updated_at: updatedUser.updatedAt,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Đã xảy ra lỗi khi cập nhật hồ sơ",
+      error: error.message,
+    });
+  }
+};
+
