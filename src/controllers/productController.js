@@ -1,11 +1,27 @@
+const jwt = require("jsonwebtoken");
 const Product = require("../models/productModel");
-
 
 exports.addProduct = async (req, res) => {
     try {
+        console.log(req.headers)
+        // Lấy token từ header
+        const token = req.headers.authorization?.split(" ")[1];
+        if (!token) {
+            return res.status(401).json({ message: "Không có token, truy cập bị từ chối!" });
+        }
+
+        // Giải mã token
+        const secretKey = process.env.ACCESS_TOKEN; // Thay bằng secret key thực tế của bạn
+        const decoded = jwt.verify(token, secretKey);
+        console.log(decoded);
+        // Kiểm tra quyền admin
+        if (decoded.roleId !== 1) {
+            return res.status(403).json({ message: "Bạn không có quyền thêm sản phẩm!" });
+        }
+
+        // Lấy dữ liệu sản phẩm từ body
         const { title, description, images, starting_price, status } = req.body;
 
-        // Kiểm tra dữ liệu đầu vào
         if (!title || !description || !images || !starting_price) {
             return res.status(400).json({ message: "Vui lòng cung cấp đầy đủ thông tin sản phẩm!" });
         }
