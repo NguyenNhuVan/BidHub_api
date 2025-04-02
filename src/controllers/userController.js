@@ -1,24 +1,40 @@
 const bcrypt = require('bcrypt');
+const jwt = require("jsonwebtoken");
 const { generateAccessToken, generateRefreshToken } = require('../utils/generationToken');
 const User = require('../models/userModel');
 const { isEmail, checkPassword } = require('../utils/validation');
 const { sendResetPasswordEmail,generateResetToken } = require('../utils/emailService');
 const saltRounds = 10;
 
-
-
-exports.showInfoUser = async (req, res) => {
-  const userId = req.user.id
+exports.getProfile = async (req, res) => {
   try {
-      const response = await userService.getInfoUser(userId)
-      return res.status(200).json(response)
+      // Lấy token từ header Authorization
+      const token = req.header("Authorization").split(" ")[1]; // "Bearer <token>"
+      console.log("token:",token);
+      if (!token) {
+          return res.status(401).json({ message: "Token không được cung cấp!" });
+      }
+
+      // Giải mã token để lấy thông tin _id người dùng
+      const decoded = jwt.verify(token, process.env.ACCESS_TOKEN); // Dùng secret key để verify token
+      console.log("Decoded:", decoded);
+      const userId = decoded._id; // Lấy _id người dùng từ token
+      console.log("userID:",userId);
+      // Truy vấn DB để lấy thông tin người dùng theo _id, ẩn mật khẩu
+      const user = await User.findById(userId).select("-password"); // select("-password") để không trả về mật khẩu
+      console.log("user:",user);
+      if (!user) {
+          return res.status(404).json({ message: "Không tìm thấy người dùng!" });
+      }
+
+      // Trả về thông tin người dùng
+      res.status(200).json({ message: "Thông tin người dùng:", data: user });
   } catch (error) {
-      return res.status(500).json({
-          err: -1,
-          msg: 'Fail at auth controller showInfoUser: ' + error
-      })
+      // Xử lý lỗi nếu token không hợp lệ hoặc xảy ra lỗi khi truy vấn DB
+      console.error("Error fetching user profile:", error);
+      res.status(500).json({ message: "Lỗi khi lấy thông tin người dùng", error: error.message });
   }
-}
+};
 
 exports.registerUser = async (req, res) => {
   try {
@@ -108,69 +124,63 @@ exports.registerUser = async (req, res) => {
 
 
 exports.loginUser = async (req, res) => {
-    console.log('Login request body:', req.body);
-    const { email, password } = req.body;
+  console.log(req.body);
+  const { email, password } = req.body;
 
-    try {
-        // Tìm user
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(200).json({
-                err: 1,
-                msg: "Tài khoản hoặc mật khẩu không đúng"
-            });
-        }
+  // Kiểm tra email và mật khẩu
+  if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+  }
 
-        // Kiểm tra password
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(200).json({
-                err: 1,
-                msg: "Tài khoản hoặc mật khẩu không đúng"
-            });
-        }
+  try {
+      // Tìm người dùng theo email
+      const user = await User.findOne({ email });
+      if (!user) {
+          return res.status(404).json({ message: "User not found" });
+      }
 
-        // Tạo tokens
-        const accessToken = generateAccessToken(user);
-        const refreshToken = generateRefreshToken(user._id);
+      // Kiểm tra mật khẩu
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+          return res.status(401).json({ message: "Invalid credentials" });
+      }
 
-        console.log('Generated tokens:', { accessToken, refreshToken }); // Debug log
+      // Tạo token
+      const refreshToken = generateRefreshToken(user._id);
+      const accessToken = generateAccessToken(user._id);
 
-        // Lưu refresh token vào database
-        await User.findByIdAndUpdate(user._id, {
-            $push: { token: refreshToken }
-        });
+      // Lưu refresh token vào cơ sở dữ liệu
+      await User.findByIdAndUpdate(user._id, {
+          $push: { token: refreshToken }, // Thêm token vào mảng token
+      });
 
-        // Set cookie
-        res.cookie("refresh-token", refreshToken, {
-            httpOnly: true,
-            secure: true,
-            path: "/",
-            sameSite: "strict",
-            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-        });
+      // Thiết lập cookie cho refresh token
+      res.cookie("refresh-token", refreshToken, {
+          httpOnly: true,
+          secure: true,
+          path: "/",
+          sameSite: "strict",
+          expires: new Date(Date.now() + 30 * 24 * 3600000), // 30 ngày
+      });
 
-        // Trả về response
-        return res.status(200).json({
-            err: 0,
-            msg: "Đăng nhập thành công",
-            access_token: accessToken,
-            refresh_token: refreshToken,
-            user: {
-                id: user._id,
-                name: user.name,
-                email: user.email,
-                role_id: user.role_id
-            }
-        });
-
-    } catch (error) {
-        console.error('Login error:', error);
-        return res.status(500).json({
-            err: 1,
-            msg: "Lỗi server"
-        });
-    }
+      // Trả về thông tin người dùng và token
+      const { name, role_id, _id } = user;
+      return res.status(200).json({
+          message: "Đăng Nhập Thành Công",
+          user: {
+              _id,
+              name,
+              email,
+              role: role_id,
+              created_at: user.created_at,
+              updated_at: user.updated_at,
+          },
+          tokenAccess: accessToken,
+          tokenRefresh: refreshToken,
+      });
+  } catch (error) {
+      res.status(500).json({ message: "Server error", error: error.message });
+  }
 };
 
 exports.logout = async (req, res) => {
