@@ -25,7 +25,6 @@ exports.getCategories = async (req, res) => {
     res.status(500).json({ message: "Lỗi khi lấy danh mục", error: error.message });
   }
 };
-
 // Lấy danh mục theo ID
 exports.getCategoryById = async (req, res) => {
   try {

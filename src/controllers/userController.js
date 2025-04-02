@@ -131,7 +131,7 @@ exports.loginUser = async (req, res) => {
         }
 
         // Tạo tokens
-        const accessToken = generateAccessToken(user._id);
+        const accessToken = generateAccessToken(user);
         const refreshToken = generateRefreshToken(user._id);
 
         console.log('Generated tokens:', { accessToken, refreshToken }); // Debug log
