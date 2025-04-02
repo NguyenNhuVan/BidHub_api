@@ -11,5 +11,6 @@ router.post('/changePassword',authenticate,userController.changePassword);
 router.post('/forgotPassword', userController.forgotPassword);
 router.get('/activate-password', userController.activateNewPassword);
 router.put('/update-profile',userController.updateProfile);
+router.get("/profile", userController.getProfile);
 
 module.exports = router;

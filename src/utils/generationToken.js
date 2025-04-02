@@ -2,7 +2,7 @@ const jwt = require("jsonwebtoken");
 
 const generateAccessToken = (user) => {
     try {
-        const accessToken = jwt.sign({email: user.email,roleId: user.role_id  }, process.env.ACCESS_TOKEN, { expiresIn: '1h' });
+        const accessToken = jwt.sign( { _id: user._id, email: user.email }, process.env.ACCESS_TOKEN, { expiresIn: '1h' });
         console.log(`Access token created for user ID: ${user._id}`);
         return accessToken; // 1 hours
     } catch (error) {
