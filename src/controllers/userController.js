@@ -14,20 +14,16 @@ exports.getProfile = async (req, res) => {
       if (!token) {
           return res.status(401).json({ message: "Token không được cung cấp!" });
       }
-
-      // Giải mã token để lấy thông tin _id người dùng
       const decoded = jwt.verify(token, process.env.ACCESS_TOKEN); // Dùng secret key để verify token
       console.log("Decoded:", decoded);
       const userId = decoded._id; // Lấy _id người dùng từ token
       console.log("userID:",userId);
-      // Truy vấn DB để lấy thông tin người dùng theo _id, ẩn mật khẩu
-      const user = await User.findById(userId).select("-password"); // select("-password") để không trả về mật khẩu
+    
+      const user = await User.findById(userId).select("-password"); 
       console.log("user:",user);
       if (!user) {
           return res.status(404).json({ message: "Không tìm thấy người dùng!" });
       }
-
-      // Trả về thông tin người dùng
       res.status(200).json({ message: "Thông tin người dùng:", data: user });
   } catch (error) {
       // Xử lý lỗi nếu token không hợp lệ hoặc xảy ra lỗi khi truy vấn DB
