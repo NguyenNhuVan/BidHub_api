@@ -1,14 +1,18 @@
 const jwt = require("jsonwebtoken");
 
 const generateAccessToken = (user) => {
-    try {
-        const accessToken = jwt.sign( { _id: user._id, email: user.email }, process.env.ACCESS_TOKEN, { expiresIn: '1h' });
-        console.log(`Access token created for user ID: ${user._id}`);
-        return accessToken; // 1 hours
-    } catch (error) {
-        console.error("Error generating access token:", error);
-        throw new Error("Unable to generate access token");
-    }
+  try {
+      const accessToken = jwt.sign(
+          { _id: user._id, email: user.email, role_id: user.role_id },
+          process.env.ACCESS_TOKEN,
+          { expiresIn: '1h' }
+      );
+      console.log(`Access token created for user ID: ${user._id}`);
+      return accessToken;
+  } catch (error) {
+      console.error("Error generating access token:", error);
+      throw new Error("Unable to generate access token");
+  }
 };
 
 const generateRefreshToken = (_id) => {

@@ -337,8 +337,9 @@ exports.updateProfile = async (req, res) => {
       avatar,
       social_links,
       id_proof,
-    } = req.body; // Các trường cần cập nhật
-    const userId = req.user._id; // Lấy ID người dùng từ middleware xác thực
+    } = req.body;
+    const userId = req.user._id; 
+    console.log('userID',userId);
 
     // Kiểm tra xem email có thay đổi không
     if (email) {
@@ -374,7 +375,6 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
-    // Trả về thông tin cập nhật
     res.status(200).json({
       message: "Cập nhật hồ sơ thành công",
       user: {
