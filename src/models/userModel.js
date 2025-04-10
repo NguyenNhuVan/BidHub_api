@@ -23,6 +23,12 @@ const userSchema = new mongoose.Schema({
     twitter: { type: String, default: '' },
     instagram: { type: String, default: '' },
   },
+  expertise: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }], // Danh sách chuyên môn
+  workload: { type: Number, default: 0 },  // Khối lượng công việc hiện tại
+  location: {
+    latitude: { type: Number, default: null },  // Vĩ độ
+    longitude: { type: Number, default: null }  // Kinh độ
+  }
 });
 
 module.exports = mongoose.model('User', userSchema);
