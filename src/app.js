@@ -11,6 +11,7 @@ const cors = require('cors');
 const app = express();
 const server = http.createServer(app);
 
+
 app.use(cors({
     origin: process.env.CLIENT_URL || "http://localhost:3000",
     credentials: true,
@@ -18,12 +19,10 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
 app.use(cookieParser());
-
 Routes(app);
-
 connectDB();
+
 
 
 const PORT = process.env.PORT || 3001;
