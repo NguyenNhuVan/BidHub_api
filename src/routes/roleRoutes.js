@@ -1,12 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const roleController = require('../controllers/roleController');
+const authenticate = require("../middlewares/authenticate");
+const checkrole = require("../middlewares/checkRole");
 
+// Route để kiểm tra vai trò của người dùng hiện tại
+router.get("/checkRole",authenticate,checkrole.checkRole );
 
-
-router.post("/creatRole",roleController.addRole);
-
-// Route xóa role bằng query
-router.delete("/deleteRole", roleController.deleteRole);
 
 module.exports = router;
