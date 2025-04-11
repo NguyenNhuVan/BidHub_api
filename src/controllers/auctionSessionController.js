@@ -7,7 +7,7 @@ const handleAuctionAssignment = async (auction, categoryId) => {
   try {
     // Tìm chuyên gia theo chuyên môn và sắp xếp theo workload
     const experts = await UserModel.find({
-      role_id: 'expert',
+      role: 'expert',
       expertise: categoryId,
     }).sort('workload');
 

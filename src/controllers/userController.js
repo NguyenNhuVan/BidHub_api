@@ -39,7 +39,6 @@ exports.registerUser = async (req, res) => {
       name: namePayload,
       email: emailPayload,
       password: passwordPayload,
-      role_id: rolePayload,
     } = req.body;
 
     // Kiểm tra email có hợp lệ không
@@ -76,7 +75,7 @@ exports.registerUser = async (req, res) => {
       name: namePayload,
       email: emailPayload,
       password: hashPassword,
-      role_id: rolePayload,
+      role: rolePayload,
     });
 
     let refreshToken;
@@ -90,7 +89,7 @@ exports.registerUser = async (req, res) => {
     }
 
     // Tạo access token
-    const accessToken = generateAccessToken(newUser._id);
+    const accessToken = generateAccessToken(newUser);
 
     // Lưu refresh token vào cơ sở dữ liệu
     newUser = await User.findByIdAndUpdate(
@@ -109,10 +108,10 @@ exports.registerUser = async (req, res) => {
     });
 
     // Lấy thông tin người dùng cần trả về
-    const { name, email, role_id, _id } = newUser;
+    const { name, email, role, _id } = newUser;
 
     return res.status(200).json({
-      user: { _id, name, email, role_id }
+      user: { _id, name, email, role }
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -126,29 +125,38 @@ exports.loginUser = async (req, res) => {
 
   // Kiểm tra email và mật khẩu
   if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+      return res.status(400).json({ 
+          err: 1,
+          msg: "Email and password are required" 
+      });
   }
 
   try {
       // Tìm người dùng theo email
       const user = await User.findOne({ email });
       if (!user) {
-          return res.status(404).json({ message: "User not found" });
+          return res.status(404).json({ 
+              err: 1,
+              msg: "User not found" 
+          });
       }
 
       // Kiểm tra mật khẩu
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
-          return res.status(401).json({ message: "Invalid credentials" });
+          return res.status(401).json({ 
+              err: 1,
+              msg: "Invalid credentials" 
+          });
       }
 
       // Tạo token
       const refreshToken = generateRefreshToken(user._id);
-      const accessToken = generateAccessToken(user._id);
+      const accessToken = generateAccessToken(user);
 
       // Lưu refresh token vào cơ sở dữ liệu
       await User.findByIdAndUpdate(user._id, {
-          $push: { token: refreshToken }, // Thêm token vào mảng token
+          $push: { token: refreshToken },
       });
 
       // Thiết lập cookie cho refresh token
@@ -157,29 +165,32 @@ exports.loginUser = async (req, res) => {
           secure: true,
           path: "/",
           sameSite: "strict",
-          expires: new Date(Date.now() + 30 * 24 * 3600000), // 30 ngày
+          expires: new Date(Date.now() + 30 * 24 * 3600000),
       });
 
       // Trả về thông tin người dùng và token
-      const { name, role_id, _id } = user;
+      const { name, role, _id } = user;
       return res.status(200).json({
-          message: "Đăng Nhập Thành Công",
+          err: 0,
+          msg: "Đăng Nhập Thành Công",
+          access_token: accessToken, // Đổi tên để phù hợp với frontend
           user: {
               _id,
               name,
               email,
-              role: role_id,
+              role: role,
               created_at: user.created_at,
               updated_at: user.updated_at,
-          },
-          tokenAccess: accessToken,
-          tokenRefresh: refreshToken,
+          }
       });
   } catch (error) {
-      res.status(500).json({ message: "Server error", error: error.message });
+      res.status(500).json({ 
+          err: 1,
+          msg: "Server error", 
+          error: error.message 
+      });
   }
 };
-
 exports.logout = async (req, res) => {
   try {
       // Đảm bảo rằng người dùng đang đăng nhập bằng token
@@ -420,7 +431,7 @@ exports.approveExpert = async (req, res) => {
     }
 
     // Kiểm tra role hiện tại (chỉ duyệt user)
-    if (user.role_id === 'expert') {
+    if (user.role === 'expert') {
       return res.status(400).json({
         success: false,
         message: 'Người dùng này đã là chuyên gia',
@@ -440,7 +451,7 @@ exports.approveExpert = async (req, res) => {
     }
 
     // Cập nhật role và chuyên môn
-    user.role_id = 'expert';
+    user.role = 'expert';
     user.expertise = expertiseIds;
     await user.save();
 

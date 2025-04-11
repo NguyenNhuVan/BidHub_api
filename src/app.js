@@ -5,7 +5,6 @@ const path = require("path");
 const Routes = require("./routes/index.js");
 const connectDB = require("./config/database.js");
 const cookieParser = require('cookie-parser');
-const bodyParser = require('body-parser');
 const cors = require('cors');
 
 const app = express();

@@ -3,10 +3,12 @@ const jwt = require("jsonwebtoken");
 const generateAccessToken = (user) => {
   try {
       const accessToken = jwt.sign(
-          { _id: user._id, email: user.email, role_id: user.role_id },
+          { _id: user._id, email: user.email, role: user.role },
           process.env.ACCESS_TOKEN,
-          { expiresIn: '1h' }
+          { expiresIn: '15m' }
       );
+      console.log(`Access token created for role: ${user.role}`);
+      console.log(`Access token created for email: ${user.email}`);
       console.log(`Access token created for user ID: ${user._id}`);
       return accessToken;
   } catch (error) {
