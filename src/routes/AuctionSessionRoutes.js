@@ -14,4 +14,13 @@ router.patch("/approve/:id", AuctionSesstionController.approveAuction);
 // 3. Từ chối phiên đấu giá
 router.patch("/reject/:id", AuctionSesstionController.rejectAuction);
 
-module.exports = router;
+router.get('/search', AuctionSesstionController.searchByTitleOrDescription);
+
+
+router.get('/getAll', AuctionSesstionController.getAllAuctionSessions); // Lấy tất cả phiên đấu giá
+
+router.get('/verified/:verifierId', AuctionSesstionController.getAuctionSessionsByVerifier); // Lấy phiên đấu giá theo verifierId
+
+router.get('/:Id', AuctionSesstionController.getAuctionSessionById); // Lấy phiên đấu giá theo auctionId
+
+module.exports = router;    

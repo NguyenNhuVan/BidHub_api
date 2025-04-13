@@ -173,7 +173,8 @@ exports.loginUser = async (req, res) => {
       return res.status(200).json({
           err: 0,
           msg: "Đăng Nhập Thành Công",
-          access_token: accessToken, // Đổi tên để phù hợp với frontend
+          access_token: accessToken, 
+          refresh_token: refreshToken,
           user: {
               _id,
               name,
