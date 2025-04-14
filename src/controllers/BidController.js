@@ -37,10 +37,8 @@ exports.placeBid = async (req, res) => {
 
         // Gửi thông báo tới tất cả người dùng trong phiên đấu giá
         if (io) {
-            // Gửi thông báo qua Socket.IO với link chuyển hướng
             io.to(auction_session_id.toString()).emit('new_bid', {
-                message: `Giá mới được đặt: ${bid_amount}`,
-                link: `/auctions/${auction_session_id}`, // FE sẽ dùng đường dẫn này để chuyển trang
+                message: 'A new bid has been placed',
                 bid: newBid,
             });
             

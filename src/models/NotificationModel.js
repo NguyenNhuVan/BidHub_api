@@ -9,8 +9,4 @@ const NotificationSchema = new mongoose.Schema({
   created_at: { type: Date, default: Date.now }
 });
 
-// Thêm index để tối ưu truy vấn
-NotificationSchema.index({ user_id: 1, created_at: -1 });
-NotificationSchema.index({ user_id: 1, is_read: 1 });
-
 module.exports = mongoose.model('Notification', NotificationSchema);
