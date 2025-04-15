@@ -16,6 +16,7 @@ router.patch("/reject/:id", AuctionSessionController.rejectAuction);
 
 router.get('/search', AuctionSessionController.searchByTitleOrDescription);
 
+router.get('/category/:idCategory', AuctionSessionController.getAuctionsByCategoryId);
 
 router.get('/getAll', AuctionSessionController.getAllAuctionSessions); // Lấy tất cả phiên đấu giá
 

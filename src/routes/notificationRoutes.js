@@ -9,7 +9,10 @@ router.get('/unread', authenticate, NotificationController.getUnreadNotification
 // Lấy tất cả thông báo
 router.get('/all', authenticate, NotificationController.getAllNotifications);
 
+
 // Đánh dấu đã đọc
 router.patch('/:notificationId/read', authenticate, NotificationController.markAsRead);
 
+
+router.get('/:user_id', NotificationController.getAllNotificationsByUserId);
 module.exports = router;

@@ -356,5 +356,38 @@ exports.rejectAuction = async (req, res) => {
       });
     }
   };
+  exports.getAuctionsByCategoryId = async (req, res) => {
+    try {
+      const { idCategory } = req.params;
   
+      // Tìm tất cả sản phẩm thuộc category_id
+      const products = await ProductModel.find({ category_id: idCategory }).select('_id');
+      if (products.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No products found in this category',
+        });
+      }
+  
+      const productIds = products.map(product => product._id);
+  
+      // Tìm tất cả phiên đấu giá liên quan đến các sản phẩm thuộc category_id
+      const auctions = await AuctionSessionModel.find({ product_id: { $in: productIds } })
+        .populate('product_id', 'title description images')
+        .populate('created_by', 'name email')
+        .populate('verified_by', 'name email')
+        .sort({ start_time: -1 });
+  
+      res.status(200).json({
+        success: true,
+        data: auctions,
+      });
+    } catch (error) {
+      console.error('Error fetching auctions by category ID:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  };
   

@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const AuctionSessionSchema = new mongoose.Schema({
-  product_id: { type: mongoose.Schema.Types.ObjectId, ref: 'AuctionItem', required: true },
+  product_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
   current_bid: { type: Number, default: 0 },
   reserve_price: { type: Number, required: true },
   buy_now_price: { type: Number, required: true },  // Giá mua ngay
