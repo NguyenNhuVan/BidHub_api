@@ -39,7 +39,7 @@ exports.registerUser = async (req, res) => {
       name: namePayload,
       email: emailPayload,
       password: passwordPayload,
-      role_id: rolePayload,
+      role: rolePayload,
     } = req.body;
 
     // Kiểm tra email có hợp lệ không
@@ -76,7 +76,7 @@ exports.registerUser = async (req, res) => {
       name: namePayload,
       email: emailPayload,
       password: hashPassword,
-      role_id: rolePayload,
+      role: rolePayload,
     });
 
     let refreshToken;
@@ -109,10 +109,10 @@ exports.registerUser = async (req, res) => {
     });
 
     // Lấy thông tin người dùng cần trả về
-    const { name, email, role_id, _id } = newUser;
+    const { name, email, role, _id } = newUser;
 
     return res.status(200).json({
-      user: { _id, name, email, role_id }
+      user: { _id, name, email, role }
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

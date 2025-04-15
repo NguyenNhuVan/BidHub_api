@@ -16,13 +16,16 @@ const io = socketIo(server, {
         credentials: true,
     },
 });
-app.use(cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
-    credentials: true,
-}));
+// app.use(cors({
+//     origin: process.env.CLIENT_URL || "http://localhost:3000",
+//     credentials: true,
+// }));
+
+// Lưu io vào app để có thể truy cập từ các controller
+app.set('io', io);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
 Routes(app);
 connectDB();
 
@@ -47,6 +50,7 @@ io.on('connection', (socket) => {
 
         newBid.save().then(() => {
             // Phát thông báo giá mới đến tất cả người tham gia
+            console.log('New bid saved:', newBid); 
             io.to(auctionSessionId).emit('bid_update', {
                 message: `Người dùng ${userId} đã đặt giá mới: ${bidAmount}`,
                 auctionSessionId: auctionSessionId,
@@ -80,4 +84,4 @@ server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
 
-module.exports = { app, io };
+module.exports = { app, server, io };

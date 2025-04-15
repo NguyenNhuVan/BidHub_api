@@ -1,6 +1,5 @@
 const AuctionSession = require('../models/auctionSessionModel');
 const Bid = require('../models/bidModel');
-const { io } = require('../app');
 const { sendNotification } = require('../utils/sendNotification');
 
 // Đặt giá mới
@@ -10,7 +9,7 @@ exports.placeBid = async (req, res) => {
 
         // Tìm phiên đấu giá
         const auction = await AuctionSession.findById(auction_session_id);
-        if (!auction) return res.status(404).json({ success: false, message: 'Auction session not found' });
+        if (!auction) return res.status(404).json({ success: false, message: 'Phiên đấu giá không được tìm thấy' });
 
         // Kiểm tra người đặt giá có phải là người tạo phiên đấu giá không
         if (auction.created_by.toString() === bidder_id.toString()) {
@@ -24,7 +23,7 @@ exports.placeBid = async (req, res) => {
         if (bid_amount < auction.current_bid + auction.min_bid_step) {
             return res.status(400).json({
                 success: false,
-                message: 'Bid amount must be at least the current bid plus the minimum step',
+                message: 'Số tiền đặt giá phải ít nhất bằng giá thầu hiện tại cộng với bước tối thiểu',
             });
         }
 
@@ -36,9 +35,11 @@ exports.placeBid = async (req, res) => {
         const newBid = await Bid.create({ auction_session_id, bidder_id, bid_amount });
 
         // Gửi thông báo tới tất cả người dùng trong phiên đấu giá
+        const io = req.app.get('io');
         if (io) {
+            console.log('Calling sendNotification for creator...');
             io.to(auction_session_id.toString()).emit('new_bid', {
-                message: 'A new bid has been placed',
+                message: 'Một giá thầu mới đã được đưa ra',
                 bid: newBid,
             });
             

@@ -1,136 +1,136 @@
 const ProductModel = require("../models/productModel");
 const AuctionSessionModel = require("../models/auctionSessionModel");
-const UserModel = require("../models/userModel");
 const Product = require('../models/productModel');
 const mongoose = require('mongoose');
+const { handleAuctionAssignment } = require('../utils/ExcellentExpert');
+const User = require('../models/userModel');
+const { sendNotification } = require('../utils/sendNotification');
+const Category = require('../models/categoryModel');
 
-const handleAuctionAssignment = async (auction, categoryId) => {
+exports.createAuction = async (req, res) => {
   try {
-    // Tìm chuyên gia theo chuyên môn và sắp xếp theo workload
-    const experts = await UserModel.find({
-      role: 'expert',
-      expertise: categoryId,
-    }).sort('workload');
+      const { 
+          title, 
+          description, 
+          images, 
+          category_id, 
+          reserve_price, 
+          buy_now_price, 
+          min_bid_step, 
+          auction_duration, 
+          deposit_percentage 
+      } = req.body;
 
-    if (experts.length === 0) {
-      console.error("No experts found for category:", categoryId);
-      throw new Error('Không có chuyên gia phù hợp để xét duyệt');
-    }
+      // Kiểm tra dữ liệu đầu vào
+      if (!title || !description || !images || !category_id || 
+          !reserve_price || !min_bid_step || !auction_duration || 
+          deposit_percentage === undefined) {
+          return res.status(400).json({
+              success: false,
+              message: "Thiếu thông tin bắt buộc",
+              requiredFields: [
+                  'title', 'description', 'images', 'category_id', 
+                  'reserve_price', 'min_bid_step', 'auction_duration', 
+                  'deposit_percentage'
+              ]
+          });
+      }
 
-    // Gán chuyên gia có workload thấp nhất
-    const assignedExpert = experts[0];
-    assignedExpert.workload += 1;
-    await assignedExpert.save().catch(err => {
-      console.error("Error updating expert workload:", err);
-      throw new Error('Không thể cập nhật workload chuyên gia');
-    });
+      // Kiểm tra user
+      if (!req.user || !req.user._id) {
+          return res.status(401).json({
+              success: false,
+              message: "Người dùng chưa đăng nhập"
+          });
+      }
 
-    // Cập nhật bài đấu giá với chuyên gia được gán
-    auction.verified_by = assignedExpert._id;
-    await auction.save().catch(err => {
-      console.error("Error updating auction with assigned expert:", err);
-      throw new Error('Không thể cập nhật phiên đấu giá với chuyên gia được gán');
-    });
+      // Kiểm tra category_id có tồn tại không
+      const category = await Category.findById(category_id);
+      if (!category) {
+          return res.status(404).json({
+              success: false,
+              message: "Danh mục không tồn tại",
+              category_id
+          });
+      }
 
-    return assignedExpert;
+      // Tính toán deposit_amount
+      const deposit_amount = (reserve_price * deposit_percentage) / 100;
+
+      // 1. Tạo sản phẩm
+      const product = await ProductModel.create({ 
+          title, 
+          description, 
+          images, 
+          category_id 
+      });
+
+      // 2. Tạo phiên đấu giá
+      const auction = await AuctionSessionModel.create({
+          product_id: product._id,
+          current_bid: 0,
+          reserve_price,
+          buy_now_price,
+          min_bid_step,
+          created_by: req.user._id,
+          auction_duration,
+          deposit_percentage,
+          deposit_amount,
+          status: 'pending'
+      });
+
+      // 3. Gán chuyên gia cho phiên đấu giá
+      try {
+          const assignmentResult = await handleAuctionAssignment(auction, category_id);
+          console.log('Assigned expert:', assignmentResult);
+          
+          // Gán chuyên gia cho phiên đấu giá nếu tìm thấy
+          if (assignmentResult.success && assignmentResult.expert) {
+              auction.verified_by = assignmentResult.expert._id;
+              await auction.save();
+
+              // Gửi thông báo cho chuyên gia
+              await sendNotification(
+                  assignmentResult.expert._id,
+                  `Bạn có một phiên đấu giá mới cần phê duyệt: ${product.title}`,
+                  'auction_created',
+                  auction._id,
+                  req.app.get('io')
+              );
+          }
+
+          res.status(201).json({ 
+              success: true,
+              message: assignmentResult.success 
+                  ? "Auction created and sent to an expert for approval" 
+                  : "Auction created but no expert assigned yet", 
+              auction,
+              assignedExpert: assignmentResult.success ? {
+                  id: assignmentResult.expert._id,
+                  name: assignmentResult.expert.name,
+                  email: assignmentResult.expert.email
+              } : null,
+              error: !assignmentResult.success ? assignmentResult.message : null
+          });
+      } catch (assignmentError) {
+          // Nếu không gán được chuyên gia, vẫn trả về auction nhưng với thông báo khác
+          res.status(201).json({ 
+              success: true,
+              message: "Auction created but no expert assigned yet", 
+              auction,
+              error: assignmentError.message
+          });
+      }
   } catch (error) {
-    console.error("Error in handleAuctionAssignment:", error.message);
-    throw error;
+      console.error("Error in createAuction:", error.message);
+      res.status(500).json({ 
+          success: false,
+          message: "Error creating auction", 
+          error: error.message 
+      });
   }
 };
 
-exports.createAuction = async (req, res) => {
-    try {
-        const { 
-            title, 
-            description, 
-            images, 
-            category_id, 
-            reserve_price, 
-            buy_now_price, 
-            min_bid_step, 
-            auction_end_time, 
-            deposit_percentage 
-        } = req.body;
-        
-        // Kiểm tra dữ liệu đầu vào
-        if (!title || !description || !images || !category_id || 
-            !reserve_price || !min_bid_step || !auction_end_time || 
-            deposit_percentage === undefined) {
-            return res.status(400).json({
-                success: false,
-                message: "Thiếu thông tin bắt buộc",
-                requiredFields: ['title', 'description', 'images', 'category_id', 
-                                'reserve_price', 'min_bid_step', 'auction_end_time', 
-                                'deposit_percentage']
-            });
-        }
-        
-        // Kiểm tra user
-        if (!req.user || !req.user._id) {
-            return res.status(401).json({
-                success: false,
-                message: "Người dùng chưa đăng nhập"
-            });
-        }
-        
-        // Tính toán deposit_amount
-        const deposit_amount = (reserve_price * deposit_percentage) / 100;
-        
-        // 1. Tạo sản phẩm
-        const product = await ProductModel.create({ 
-            title, 
-            description, 
-            images, 
-            category_id 
-        });
-        
-        // 2. Tạo phiên đấu giá
-        const auction = await AuctionSessionModel.create({
-            product_id: product._id,
-            current_bid: 0,
-            reserve_price,
-            buy_now_price,
-            min_bid_step,
-            auction_end_time,
-            deposit_percentage,
-            deposit_amount,
-            created_by: req.user._id,
-            status: 'pending'
-        });
-        
-        // 3. Gán chuyên gia cho auction
-        try {
-            const assignedExpert = await handleAuctionAssignment(auction, category_id);
-            
-            res.status(201).json({ 
-                success: true,
-                message: "Auction created and sent to an expert for approval", 
-                auction,
-                assignedExpert: {
-                    id: assignedExpert._id,
-                    name: assignedExpert.name,
-                    email: assignedExpert.email
-                }
-            });
-        } catch (assignmentError) {
-            // Nếu không gán được chuyên gia, vẫn trả về auction nhưng với thông báo khác
-            res.status(201).json({ 
-                success: true,
-                message: "Auction created but no expert assigned yet", 
-                auction,
-                error: assignmentError.message
-            });
-        }
-    } catch (error) {
-        console.error("Error in createAuction:", error.message);
-        res.status(500).json({ 
-            success: false,
-            message: "Error creating auction", 
-            error: error.message 
-        });
-    }
-};
 
 exports.getAllAuctionSessions = async (req, res) => {
   try {
@@ -254,10 +254,22 @@ exports.approveAuction = async (req, res) => {
       const auction = await AuctionSessionModel.findById(id);
       if (!auction) return res.status(404).json({ message: "Auction not found" });
   
+      if (auction.verified_by.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ success: false, error: 'Not authorized to approve this auction' });
+      }
+  
       // Cập nhật trạng thái và người phê duyệt
-      auction.status = "approved";
-      auction.verified_by = req.user.id; // ID của chuyên gia thực hiện phê duyệt
+      auction.status = "active";
       await auction.save();
+  
+      // Gửi thông báo cho người tạo phiên đấu giá
+      await sendNotification(
+        auction.created_by,
+        `Phiên đấu giá "${auction._id}" đã được phê duyệt`,
+        'auction_approved',
+        auction._id,
+        req.app.get('io')
+      );
   
       res.status(200).json({ message: "Auction approved successfully", auction });
     } catch (error) {
@@ -273,11 +285,23 @@ exports.rejectAuction = async (req, res) => {
       const auction = await AuctionSessionModel.findById(id);
       if (!auction) return res.status(404).json({ message: "Auction not found" });
   
+      if (auction.verified_by.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ success: false, error: 'Not authorized to reject this auction' });
+      }
+  
       // Cập nhật trạng thái và người phê duyệt
-      auction.status = "rejected";
-      auction.verified_by = req.user.id; // ID của chuyên gia thực hiện từ chối
+      auction.status = "cancelled";
       auction.rejection_reason = reason || "No reason provided"; // Lưu lý do từ chối (tuỳ chọn)
       await auction.save();
+  
+      // Gửi thông báo cho người tạo phiên đấu giá
+      await sendNotification(
+        auction.created_by,
+        `Phiên đấu giá "${auction._id}" đã bị từ chối`,
+        'auction_rejected',
+        auction._id,
+        req.app.get('io')
+      );
   
       res.status(200).json({ message: "Auction rejected successfully", auction });
     } catch (error) {
