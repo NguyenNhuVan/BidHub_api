@@ -16,12 +16,12 @@ const io = socketIo(server, {
         credentials: true,
     },
 });
-// app.use(cors({
-//     origin: process.env.CLIENT_URL || "http://localhost:3000",
-//     credentials: true,
-// }));
+app.use(cors({
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    credentials: true,
+}));
 
-// Lưu io vào app để có thể truy cập từ các controller
+
 app.set('io', io);
 
 app.use(express.json());

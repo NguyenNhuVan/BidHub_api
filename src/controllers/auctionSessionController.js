@@ -9,125 +9,145 @@ const Category = require('../models/categoryModel');
 
 exports.createAuction = async (req, res) => {
   try {
-      const { 
-          title, 
-          description, 
-          images, 
-          category_id, 
-          reserve_price, 
-          buy_now_price, 
-          min_bid_step, 
-          auction_duration, 
-          deposit_percentage 
-      } = req.body;
+    const { 
+      title, 
+      description, 
+      images, 
+      category_id, 
+      reserve_price, 
+      buy_now_price, 
+      min_bid_step, 
+      auction_duration, 
+      deposit_percentage,
+      shipping_method, 
+      payment_method
+    } = req.body;
 
-      // Kiểm tra dữ liệu đầu vào
-      if (!title || !description || !images || !category_id || 
-          !reserve_price || !min_bid_step || !auction_duration || 
-          deposit_percentage === undefined) {
-          return res.status(400).json({
-              success: false,
-              message: "Thiếu thông tin bắt buộc",
-              requiredFields: [
-                  'title', 'description', 'images', 'category_id', 
-                  'reserve_price', 'min_bid_step', 'auction_duration', 
-                  'deposit_percentage'
-              ]
-          });
-      }
-
-      // Kiểm tra user
-      if (!req.user || !req.user._id) {
-          return res.status(401).json({
-              success: false,
-              message: "Người dùng chưa đăng nhập"
-          });
-      }
-
-      // Kiểm tra category_id có tồn tại không
-      const category = await Category.findById(category_id);
-      if (!category) {
-          return res.status(404).json({
-              success: false,
-              message: "Danh mục không tồn tại",
-              category_id
-          });
-      }
-
-      // Tính toán deposit_amount
-      const deposit_amount = (reserve_price * deposit_percentage) / 100;
-
-      // 1. Tạo sản phẩm
-      const product = await ProductModel.create({ 
-          title, 
-          description, 
-          images, 
-          category_id 
+    // Kiểm tra dữ liệu đầu vào
+    if (!title || !description || !images || !category_id || 
+        !reserve_price || !buy_now_price || !min_bid_step || 
+        !auction_duration || deposit_percentage === undefined || 
+        !shipping_method || !payment_method) {
+      return res.status(400).json({
+        success: false,
+        message: "Thiếu thông tin bắt buộc",
+        requiredFields: [
+          'title', 'description', 'images', 'category_id', 
+          'reserve_price', 'buy_now_price', 'min_bid_step', 
+          'auction_duration', 'deposit_percentage', 
+          'shipping_method', 'payment_method'
+        ]
       });
+    }
 
-      // 2. Tạo phiên đấu giá
-      const auction = await AuctionSessionModel.create({
-          product_id: product._id,
-          current_bid: 0,
-          reserve_price,
-          buy_now_price,
-          min_bid_step,
-          created_by: req.user._id,
-          auction_duration,
-          deposit_percentage,
-          deposit_amount,
-          status: 'pending'
+    // Kiểm tra giá trị hợp lệ cho shipping_method và payment_method
+    const validShippingMethods = ['Giao tận nơi', 'Gặp trực tiếp'];
+    const validPaymentMethods = ['Chuyển khoản ngân hàng', 'Tiền mặt'];
+
+    if (!validShippingMethods.includes(shipping_method) || 
+        !validPaymentMethods.includes(payment_method)) {
+      return res.status(400).json({
+        success: false,
+        message: "Giá trị shipping_method hoặc payment_method không hợp lệ",
+        validShippingMethods,
+        validPaymentMethods
       });
+    }
 
-      // 3. Gán chuyên gia cho phiên đấu giá
-      try {
-          const assignmentResult = await handleAuctionAssignment(auction, category_id);
-          console.log('Assigned expert:', assignmentResult);
-          
-          // Gán chuyên gia cho phiên đấu giá nếu tìm thấy
-          if (assignmentResult.success && assignmentResult.expert) {
-              auction.verified_by = assignmentResult.expert._id;
-              await auction.save();
+    // Kiểm tra user
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: "Người dùng chưa đăng nhập"
+      });
+    }
 
-              // Gửi thông báo cho chuyên gia
-              await sendNotification(
-                  assignmentResult.expert._id,
-                  `Bạn có một phiên đấu giá mới cần phê duyệt: ${product.title}`,
-                  'auction_created',
-                  auction._id,
-                  req.app.get('io')
-              );
-          }
+    // Kiểm tra category_id có tồn tại không
+    const category = await Category.findById(category_id);
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: "Danh mục không tồn tại",
+        category_id
+      });
+    }
 
-          res.status(201).json({ 
-              success: true,
-              message: assignmentResult.success 
-                  ? "Auction created and sent to an expert for approval" 
-                  : "Auction created but no expert assigned yet", 
-              auction,
-              assignedExpert: assignmentResult.success ? {
-                  id: assignmentResult.expert._id,
-                  name: assignmentResult.expert.name,
-                  email: assignmentResult.expert.email
-              } : null,
-              error: !assignmentResult.success ? assignmentResult.message : null
-          });
-      } catch (assignmentError) {
-          // Nếu không gán được chuyên gia, vẫn trả về auction nhưng với thông báo khác
-          res.status(201).json({ 
-              success: true,
-              message: "Auction created but no expert assigned yet", 
-              auction,
-              error: assignmentError.message
-          });
+    // Tính toán deposit_amount
+    const deposit_amount = (reserve_price * deposit_percentage) / 100;
+
+    // 1. Tạo sản phẩm
+    const product = await ProductModel.create({ 
+      title, 
+      description, 
+      images, 
+      category_id 
+    });
+
+    // 2. Tạo phiên đấu giá
+    const auction = await AuctionSessionModel.create({
+      product_id: product._id,
+      current_bid: 0,
+      reserve_price,
+      buy_now_price,
+      min_bid_step,
+      created_by: req.user._id,
+      auction_duration,
+      deposit_percentage,
+      deposit_amount,
+      shipping_method,
+      payment_method,
+      status: 'pending'
+    });
+
+    // 3. Gán chuyên gia cho phiên đấu giá
+    try {
+      const assignmentResult = await handleAuctionAssignment(auction, category_id);
+      console.log('Assigned expert:', assignmentResult);
+
+      // Gán chuyên gia cho phiên đấu giá nếu tìm thấy
+      if (assignmentResult.success && assignmentResult.expert) {
+        auction.verified_by = assignmentResult.expert._id;
+        await auction.save();
+
+        // Gửi thông báo cho chuyên gia
+        await sendNotification(
+          assignmentResult.expert._id,
+          `Bạn có một phiên đấu giá mới cần phê duyệt: ${product.title}`,
+          'auction_created',
+          auction._id,
+          req.app.get('io')
+        );
       }
+
+      res.status(201).json({ 
+        success: true,
+        message: assignmentResult.success 
+          ? "Auction created and sent to an expert for approval" 
+          : "Auction created but no expert assigned yet", 
+        auction,
+        assignedExpert: assignmentResult.success ? {
+          id: assignmentResult.expert._id,
+          name: assignmentResult.expert.name,
+          email: assignmentResult.expert.email
+        } : null,
+        error: !assignmentResult.success ? assignmentResult.message : null
+      });
+    } catch (assignmentError) {
+      // Nếu không gán được chuyên gia, vẫn trả về auction nhưng với thông báo khác
+      res.status(201).json({ 
+        success: true,
+        message: "Auction created but no expert assigned yet", 
+        auction,
+        error: assignmentError.message
+      });
+    }
   } catch (error) {
-      console.error("Error in createAuction:", error.message);
-      res.status(500).json({ 
-          success: false,
-          message: "Error creating auction", 
-          error: error.message 
-      });
+    console.error("Error in createAuction:", error.message);
+    res.status(500).json({ 
+      success: false,
+      message: "Error creating auction", 
+      error: error.message 
+    });
   }
 };
 

@@ -11,9 +11,19 @@ const AuctionSessionSchema = new mongoose.Schema({
   status: { type: String, default: 'pending' },
   auction_duration: { type: Number, required: true }, // Số ngày đấu giá
   start_time: { type: Date, default: Date.now }, // Thời điểm bắt đầu (khi được phê duyệt)
-  end_time: { type: Date,default: Date.now },   // Thời điểm kết thúc
+  end_time: { type: Date, default: Date.now },   // Thời điểm kết thúc
   deposit_percentage: { type: Number, required: true },
-  deposit_amount: { type: Number, required: true }
+  deposit_amount: { type: Number, required: true },
+  shipping_method: { 
+    type: String, 
+    required: true,
+    enum: ['Giao tận nơi', 'Gặp trực tiếp'] 
+  },
+  payment_method: { 
+    type: String, 
+    required: true,
+    enum: ['Chuyển khoản ngân hàng', 'Tiền mặt'] 
+  }
 });
 
 // Middleware để tự động cập nhật thời gian kết thúc khi phiên đấu giá được phê duyệt
@@ -26,3 +36,4 @@ AuctionSessionSchema.pre('save', function(next) {
 });
 
 module.exports = mongoose.model('AuctionSession', AuctionSessionSchema);
+

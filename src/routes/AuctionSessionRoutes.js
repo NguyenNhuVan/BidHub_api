@@ -18,10 +18,9 @@ router.get('/search', AuctionSessionController.searchByTitleOrDescription);
 
 router.get('/category/:idCategory', AuctionSessionController.getAuctionsByCategoryId);
 
-router.get('/getAll', AuctionSessionController.getAllAuctionSessions); // Lấy tất cả phiên đấu giá
+router.get('/getAll', AuctionSessionController.getAllAuctionSessions); 
 
-router.get('/verified/:verifierId', AuctionSessionController.getAuctionSessionsByVerifier); // Lấy phiên đấu giá theo verifierId
-
-router.get('/:id', AuctionSessionController.getAuctionSessionById); // Lấy phiên đấu giá theo auctionId
+router.get('/verified/:verifierId', AuctionSessionController.getAuctionSessionsByVerifier); 
+router.get('/:id', AuctionSessionController.getAuctionSessionById); 
 
 module.exports = router;    
