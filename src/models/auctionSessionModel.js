@@ -28,7 +28,7 @@ const AuctionSessionSchema = new mongoose.Schema({
 
 // Middleware để tự động cập nhật thời gian kết thúc khi phiên đấu giá được phê duyệt
 AuctionSessionSchema.pre('save', function(next) {
-  if (this.isModified('status') && this.status === 'active' && !this.start_time) {
+  if (this.isModified('status') && this.status === 'approved' && !this.start_time) {
     this.start_time = new Date();
     this.end_time = new Date(this.start_time.getTime() + (this.auction_duration * 24 * 60 * 60 * 1000));
   }

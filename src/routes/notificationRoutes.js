@@ -14,5 +14,4 @@ router.get('/all', authenticate, NotificationController.getAllNotifications);
 router.patch('/:notificationId/read', authenticate, NotificationController.markAsRead);
 
 
-router.get('/:user_id', NotificationController.getAllNotificationsByUserId);
 module.exports = router;

@@ -14,7 +14,7 @@ const getUnreadNotifications = async (req, res) => {
     res.json({ success: true, data: notifications });
   } catch (err) {
     console.error('Error fetching notifications:', err);
-    res.status(500).json({ success: false, error: 'Failed to fetch notifications' });
+    res.status(500).json({ success: false, error: 'Failed to fetch notifications' } );
   }
 };
 
@@ -63,33 +63,8 @@ const getAllNotifications = async (req, res) => {
   }
 };
 
-
-const getAllNotificationsByUserId = async (req, res) => {
-  try {
-    const { user_id } = req.params;
-
-    // Tìm tất cả các thông báo của user dựa trên user_id
-    const notifications = await Notification.find({ user_id })
-      .sort({ created_at: -1 }) // Sắp xếp theo thời gian tạo (mới nhất trước)
-      .populate('user_id', 'name email') // Tùy chọn populate thêm thông tin user nếu cần
-      .exec();
-
-    res.status(200).json({
-      success: true,
-      data: notifications,
-    });
-  } catch (error) {
-    console.error('Error fetching notifications:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching notifications',
-    });
-  }
-};
-
 module.exports = { 
   getUnreadNotifications, 
   markAsRead,
   getAllNotifications,
-  getAllNotificationsByUserId 
 };

@@ -39,7 +39,6 @@ io.on('connection', (socket) => {
         socket.join(auctionSessionId);
     });
 
-    // Thông báo khi có giá mới
     socket.on('new_bid', (auctionSessionId, bidAmount, userId) => {
         // Lưu bid vào database (ví dụ sử dụng Mongoose)
         const newBid = new Bid({
@@ -61,7 +60,7 @@ io.on('connection', (socket) => {
         });
     });
 
-    // Thông báo kết thúc phiên đấu giá
+
     socket.on('end_auction', (auctionSessionId) => {
         io.to(auctionSessionId).emit('auction_ended', {
             message: `Phiên đấu giá với ID ${auctionSessionId} đã kết thúc!`
@@ -73,7 +72,6 @@ io.on('connection', (socket) => {
     });
 });
 
-// Cron job or event check for auction end notifications
 const { checkAuctionEnd } = require('./utils/auctionScheduler');
 setInterval(() => {
     checkAuctionEnd(io);

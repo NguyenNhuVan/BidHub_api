@@ -72,7 +72,7 @@ exports.createAuction = async (req, res) => {
       });
     }
 
-    // Tính toán deposit_amount
+   
     const deposit_amount = (reserve_price * deposit_percentage) / 100;
 
     // 1. Tạo sản phẩm
@@ -104,7 +104,6 @@ exports.createAuction = async (req, res) => {
       const assignmentResult = await handleAuctionAssignment(auction, category_id);
       console.log('Assigned expert:', assignmentResult);
 
-      // Gán chuyên gia cho phiên đấu giá nếu tìm thấy
       if (assignmentResult.success && assignmentResult.expert) {
         auction.verified_by = assignmentResult.expert._id;
         await auction.save();
@@ -279,7 +278,7 @@ exports.approveAuction = async (req, res) => {
       }
   
       // Cập nhật trạng thái và người phê duyệt
-      auction.status = "active";
+      auction.status = "approved";
       await auction.save();
   
       // Gửi thông báo cho người tạo phiên đấu giá
