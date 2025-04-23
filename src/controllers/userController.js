@@ -9,27 +9,32 @@ const saltRounds = 10;
 
 exports.getProfile = async (req, res) => {
   try {
-      // Lấy token từ header Authorization
-      const token = req.header("Authorization").split(" ")[1]; // "Bearer <token>"
-      console.log("token:",token);
-      if (!token) {
-          return res.status(401).json({ message: "Token không được cung cấp!" });
-      }
-      const decoded = jwt.verify(token, process.env.ACCESS_TOKEN); // Dùng secret key để verify token
-      console.log("Decoded:", decoded);
-      const userId = decoded._id; // Lấy _id người dùng từ token
-      console.log("userID:",userId);
+    const token = req.header("Authorization")?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ message: "Token không được cung cấp!" });
+    }
     
-      const user = await User.findById(userId).select("-password"); 
-      console.log("user:",user);
-      if (!user) {
-          return res.status(404).json({ message: "Không tìm thấy người dùng!" });
-      }
-      res.status(200).json({ message: "Thông tin người dùng:", data: user });
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN);
+    const userId = decoded._id;
+    
+    const user = await User.findById(userId)
+      .select("-password -token -resetPasswordToken -resetPasswordExpires")
+      .populate('expertise', 'name'); // Populate expertise with category names
+    
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng!" });
+    }
+    
+    res.status(200).json({ 
+      message: "Thông tin người dùng:", 
+      data: user 
+    });
   } catch (error) {
-      // Xử lý lỗi nếu token không hợp lệ hoặc xảy ra lỗi khi truy vấn DB
-      console.error("Error fetching user profile:", error);
-      res.status(500).json({ message: "Lỗi khi lấy thông tin người dùng", error: error.message });
+    console.error("Error fetching user profile:", error);
+    res.status(500).json({ 
+      message: "Lỗi khi lấy thông tin người dùng", 
+      error: error.message 
+    });
   }
 };
 
@@ -121,76 +126,77 @@ exports.registerUser = async (req, res) => {
 
 
 exports.loginUser = async (req, res) => {
-  console.log(req.body);
   const { email, password } = req.body;
 
-  // Kiểm tra email và mật khẩu
   if (!email || !password) {
-      return res.status(400).json({ 
-          err: 1,
-          msg: "Email and password are required" 
-      });
+    return res.status(400).json({ 
+      err: 1,
+      msg: "Email and password are required" 
+    });
   }
 
   try {
-      // Tìm người dùng theo email
-      const user = await User.findOne({ email });
-      if (!user) {
-          return res.status(404).json({ 
-              err: 1,
-              msg: "User not found" 
-          });
-      }
-
-      // Kiểm tra mật khẩu
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) {
-          return res.status(401).json({ 
-              err: 1,
-              msg: "Invalid credentials" 
-          });
-      }
-
-      // Tạo token
-      const refreshToken = generateRefreshToken(user._id);
-      const accessToken = generateAccessToken(user);
-
-      // Lưu refresh token vào cơ sở dữ liệu
-      await User.findByIdAndUpdate(user._id, {
-          $push: { token: refreshToken },
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ 
+        err: 1,
+        msg: "User not found" 
       });
+    }
 
-      // Thiết lập cookie cho refresh token
-      res.cookie("refresh-token", refreshToken, {
-          httpOnly: true,
-          secure: true,
-          path: "/",
-          sameSite: "strict",
-          expires: new Date(Date.now() + 30 * 24 * 3600000),
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ 
+        err: 1,
+        msg: "Invalid credentials" 
       });
+    }
 
-      // Trả về thông tin người dùng và token
-      const { name, role, _id } = user;
-      return res.status(200).json({
-          err: 0,
-          msg: "Đăng Nhập Thành Công",
-          access_token: accessToken, 
-          refresh_token: refreshToken,
-          user: {
-              _id,
-              name,
-              email,
-              role: role,
-              created_at: user.created_at,
-              updated_at: user.updated_at,
-          }
-      });
+    const refreshToken = generateRefreshToken(user._id);
+    const accessToken = generateAccessToken(user);
+
+    await User.findByIdAndUpdate(user._id, {
+      $push: { token: refreshToken },
+    });
+
+    res.cookie("refresh-token", refreshToken, {
+      httpOnly: true,
+      secure: true,
+      path: "/",
+      sameSite: "strict",
+      expires: new Date(Date.now() + 30 * 24 * 3600000),
+    });
+
+    // Exclude sensitive fields from response
+    const userResponse = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar,
+      phone: user.phone,
+      address: user.address,
+      dob: user.dob,
+      expertise: user.expertise,
+      qualifications: user.qualifications,
+      experience_years: user.experience_years,
+      created_at: user.createdAt,
+      updated_at: user.updatedAt,
+    };
+
+    return res.status(200).json({
+      err: 0,
+      msg: "Đăng Nhập Thành Công",
+      access_token: accessToken, 
+      refresh_token: refreshToken,
+      user: userResponse
+    });
   } catch (error) {
-      res.status(500).json({ 
-          err: 1,
-          msg: "Server error", 
-          error: error.message 
-      });
+    res.status(500).json({ 
+      err: 1,
+      msg: "Server error", 
+      error: error.message 
+    });
   }
 };
 exports.logout = async (req, res) => {
@@ -315,7 +321,7 @@ exports.activateNewPassword = async (req, res) => {
     }
 };
 exports.validateUserProfile = (req, res, next) => {
-  const user = req.user; // Lấy thông tin người dùng từ middleware xác thực
+  const user = req.user; 
   
   if (!user) {
     return res.status(401).json({ message: "Người dùng chưa đăng nhập" });
@@ -350,12 +356,12 @@ exports.updateProfile = async (req, res) => {
       dob,
       avatar,
       social_links,
-      id_proof,
+      introduce,
+      cccd
     } = req.body;
-    const userId = req.user._id; 
-    console.log('userID',userId);
+    
+    const userId = req.user._id;
 
-    // Kiểm tra xem email có thay đổi không
     if (email) {
       const emailExists = await User.findOne({ email, _id: { $ne: userId } });
       if (emailExists) {
@@ -365,7 +371,6 @@ exports.updateProfile = async (req, res) => {
       }
     }
 
-    // Xây dựng đối tượng cập nhật
     const updateFields = {};
     if (name) updateFields.name = name;
     if (email) updateFields.email = email;
@@ -373,15 +378,26 @@ exports.updateProfile = async (req, res) => {
     if (address) updateFields.address = address;
     if (dob) updateFields.dob = dob;
     if (avatar) updateFields.avatar = avatar;
-    if (social_links) updateFields.social_links = social_links;
-    if (id_proof) updateFields.id_proof = id_proof;
+    if (introduce) updateFields.introduce = introduce;
+    if (social_links) {
+      updateFields.social_links = {
+        facebook: social_links.facebook || '',
+        twitter: social_links.twitter || '',
+        instagram: social_links.instagram || ''
+      };
+    }
+    if (cccd) {
+      updateFields.cccd = {
+        number: cccd.number || '',
+        photo: cccd.photo || ''
+      };
+    }
 
-    // Cập nhật thông tin người dùng
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: updateFields },
       { new: true, runValidators: true }
-    );
+    ).select('-password -token -resetPasswordToken -resetPasswordExpires');
 
     if (!updatedUser) {
       return res.status(404).json({
@@ -391,23 +407,177 @@ exports.updateProfile = async (req, res) => {
 
     res.status(200).json({
       message: "Cập nhật hồ sơ thành công",
-      user: {
-        _id: updatedUser._id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        phone: updatedUser.phone,
-        address: updatedUser.address,
-        dob: updatedUser.dob,
-        avatar: updatedUser.avatar,
-        social_links: updatedUser.social_links,
-        id_proof: updatedUser.id_proof,
-        updated_at: updatedUser.updatedAt,
-      },
+      user: updatedUser
     });
   } catch (error) {
     res.status(500).json({
       message: "Đã xảy ra lỗi khi cập nhật hồ sơ",
       error: error.message,
+    });
+  }
+};
+
+
+exports.getInfoUser = async (userId) => {
+    try {
+        // Kiểm tra nếu userId không hợp lệ
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return {
+                err: 1,
+                msg: "Invalid user ID",
+            };
+        }
+
+        // Truy vấn MongoDB để tìm user theo _id
+        const user = await User.findById(userId).select("id name email");
+
+        if (!user) {
+            return {
+                err: 1,
+                msg: "User not found",
+            };
+        }
+
+        return {
+            err: 0,
+            msg: "Get user info success",
+            info_user: user,
+        };
+    } catch (err) {
+        return {
+            err: 1,
+            msg: err.message, // Trả về thông báo lỗi cụ thể
+        };
+    }
+};
+
+exports.registerExpert = async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      phone,
+      address,
+      dob,
+      cccd,
+      expertiseIds,
+      qualifications,
+      experience_years,
+      password,
+      confirm_password,
+      introduce
+    } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !phone || !address || !dob || !cccd || !cccd.number || !cccd.photo ||
+        !expertiseIds || !qualifications || !experience_years || !password || !confirm_password) {
+      return res.status(400).json({
+        err: 1,
+        msg: "Vui lòng điền đầy đủ thông tin"
+      });
+    }
+
+    // Validate expertiseIds
+    if (!Array.isArray(expertiseIds)) {
+      return res.status(400).json({
+        err: 1,
+        msg: "Chuyên môn phải là một mảng"
+      });
+    }
+
+    // Validate qualifications
+    if (!Array.isArray(qualifications) || qualifications.some(q => !q.degree || !q.photo)) {
+      return res.status(400).json({
+        err: 1,
+        msg: "Bằng cấp phải có đầy đủ thông tin"
+      });
+    }
+
+    // Validate password match
+    if (password !== confirm_password) {
+      return res.status(400).json({
+        err: 1,
+        msg: "Mật khẩu không khớp"
+      });
+    }
+
+    // Check if user exists
+    const existingUser = await User.findOne({ email });
+    if (!existingUser) {
+      return res.status(404).json({
+        err: 1,
+        msg: "Người dùng không tồn tại"
+      });
+    }
+
+    // Check if user is already an expert or pending expert
+    if (existingUser.role === 'expert' || existingUser.role === 'pending_expert') {
+      return res.status(400).json({
+        err: 1,
+        msg: "Bạn đã đăng ký làm chuyên gia hoặc đã là chuyên gia"
+      });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Update user information
+    const updatedUser = await User.findByIdAndUpdate(
+      existingUser._id,
+      {
+        $set: {
+          name,
+          email,
+          phone,
+          address,
+          dob,
+          introduce,
+          cccd: {
+            number: cccd.number,
+            photo: cccd.photo
+          },
+          expertise: expertiseIds,
+          qualifications: qualifications.map(qual => ({
+            degree: qual.degree,
+            photo: qual.photo
+          })),
+          experience_years,
+          password: hashedPassword,
+          role: 'pending_expert',
+          expert_application: {
+            status: 'pending',
+            submitted_at: new Date(),
+            expertise: expertiseIds,
+            qualifications: qualifications,
+            experience_years: experience_years,
+            personal_info: {
+              name,
+              email,
+              phone,
+              address,
+              dob,
+              cccd
+            }
+          }
+        }
+      },
+      { new: true }
+    ).select('-password -token -resetPasswordToken -resetPasswordExpires');
+
+    // In a real application, you would send a notification to admin here
+
+    return res.status(200).json({
+      err: 0,
+      msg: "Đăng ký chuyên gia thành công, đang chờ phê duyệt",
+      data: updatedUser
+    });
+
+  } catch (error) {
+    console.error('Error in registerExpert:', error);
+    return res.status(500).json({
+      err: 1,
+      msg: "Lỗi server",
+      error: error.message
     });
   }
 };

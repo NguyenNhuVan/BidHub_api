@@ -12,7 +12,6 @@ const userSchema = new mongoose.Schema({
   dob: { type: Date, default: null },
   introduce: {type: String, default: '' },
   watchlist: { type: Array, default: [] },
-  payment_methods: { type: Array, default: [] },
     cccd: { 
     number: { type: String, default: ''}, // Số CCCD
     photo: { type: String, default: '' }, // Ảnh CCCD
@@ -27,8 +26,8 @@ const userSchema = new mongoose.Schema({
 
   expertise: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }], 
   qualifications: [{ 
-    degree: { type: String, default: '' }, // Tên bằng cấp
-    photo: { type: String, default: '' }, // Ảnh bằng cấp
+    degree: { type: String, default: '' }, 
+    photo: { type: String, default: '' }, 
   }],
   experience_years: { type: Number, default: 0 }, 
   workload: { type: Number, default: 0 }
