@@ -72,7 +72,7 @@ exports.createAuction = async (req, res) => {
       });
     }
 
-   
+    // Tính toán deposit_amount
     const deposit_amount = (reserve_price * deposit_percentage) / 100;
 
     // 1. Tạo sản phẩm
@@ -96,14 +96,18 @@ exports.createAuction = async (req, res) => {
       deposit_amount,
       shipping_method,
       payment_method,
-      status: 'pending'
+      status: 'pending',
+      start_time: undefined,
+      end_time: undefined
     });
+    
 
     // 3. Gán chuyên gia cho phiên đấu giá
     try {
       const assignmentResult = await handleAuctionAssignment(auction, category_id);
       console.log('Assigned expert:', assignmentResult);
 
+      // Gán chuyên gia cho phiên đấu giá nếu tìm thấy
       if (assignmentResult.success && assignmentResult.expert) {
         auction.verified_by = assignmentResult.expert._id;
         await auction.save();
@@ -183,13 +187,17 @@ exports.getAuctionSessionById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Kiểm tra xem ID có hợp lệ không
+    // Nếu id không hợp lệ, return luôn, các lệnh sau không chạy!
     if (!mongoose.Types.ObjectId.isValid(id)) {
+      console.log('ID không hợp lệ:', id); // Đặt ở đây sẽ thấy log nếu id sai
       return res.status(400).json({
         success: false,
         message: 'ID phiên đấu giá không hợp lệ.',
       });
     }
+
+    // Nếu đặt console.log ở đây, chỉ chạy khi id hợp lệ!
+    console.log('ID hợp lệ:', id);
 
     // Tìm phiên đấu giá và populate các trường liên quan
     const auctionSession = await AuctionSessionModel.findById(id)
@@ -409,4 +417,104 @@ exports.rejectAuction = async (req, res) => {
       });
     }
   };
-  
+  // server/src/controllers/userController.js
+exports.toggleWatchlist = async (req, res) => {
+  try {
+    const { userId, auctionId } = req.body;
+    const user = await User.findById(userId);
+    
+    // Kiểm tra xem auction đã trong watchlist chưa
+    const isInWatchlist = user.watchlist.includes(auctionId);
+    
+    if (isInWatchlist) {
+      // Nếu đã có thì xóa đi
+      await user.removeFromWatchlist(auctionId);
+      res.json({ message: 'Đã xóa khỏi danh sách yêu thích', isInWatchlist: false });
+    } else {
+      // Nếu chưa có thì thêm vào
+      await user.addToWatchlist(auctionId);
+      res.json({ message: 'Đã thêm vào danh sách yêu thích', isInWatchlist: true });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.filterAuctionSessions = async (req, res) => {
+  try {
+    const filters = req.body; // Giả sử các tiêu chí lọc được gửi qua body của request
+    const query = {};
+
+    // Thêm điều kiện vào truy vấn nếu được cung cấp
+    if (filters.product_id) {
+      query.product_id = filters.product_id;
+    }
+    if (filters.created_by) {
+      query.created_by = filters.created_by;
+    }
+    if (filters.verified_by) {
+      query.verified_by = filters.verified_by;
+    }
+    if (filters.status) {
+      query.status = filters.status;
+    }
+    if (filters.min_current_bid) {
+      query.current_bid = { ...query.current_bid, $gte: filters.min_current_bid };
+    }
+    if (filters.max_current_bid) {
+      query.current_bid = { ...query.current_bid, $lte: filters.max_current_bid };
+    }
+    if (filters.start_time) {
+      query.start_time = { $gte: new Date(filters.start_time) };
+    }
+    if (filters.end_time) {
+      query.end_time = { $lte: new Date(filters.end_time) };
+    }
+    if (filters.shipping_method) {
+      query.shipping_method = filters.shipping_method;
+    }
+    if (filters.payment_method) {
+      query.payment_method = filters.payment_method;
+    }
+
+    // Truy vấn MongoDB
+    const auctionSessions = await AuctionSession.find(query);
+
+    res.status(200).json({
+      success: true,
+      message: 'Danh sách phiên đấu giá đã được lọc.',
+      data: auctionSessions,
+    });
+  } catch (error) {
+    console.error('Error filtering auction sessions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Đã xảy ra lỗi khi lọc phiên đấu giá.',
+      error: error.message,
+    });
+  }
+};
+
+exports.getWatchlistAuctionSessions = async (req, res) => {
+  try {
+    // Lấy userId từ token hoặc params tuỳ bạn (ở đây giả sử req.user.id)
+    const userId = req.user._id;// hoặc req.params.userId
+    console.log(userId);
+    // Tìm user
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    console.log(user);
+    // Lấy danh sách id phiên đấu giá từ watchlist
+    const watchlistIds = user.watchlist;
+    console.log(watchlistIds);
+    // Lấy thông tin các phiên đấu giá
+    const auctionSessions = await AuctionSessionModel.find({
+      _id: { $in: watchlistIds }
+    });
+    console.log(auctionSessions);
+
+    return res.json({ watchlist: auctionSessions });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};

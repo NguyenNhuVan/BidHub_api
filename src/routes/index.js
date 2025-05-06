@@ -17,4 +17,5 @@ module.exports = (app) => {
     app.use("/notification",notificationRoutes);
     app.use("/api",fileRoutes);
     app.use("/admin",adminRoutes);
+    app.use('/payment', paymentRouter);
 };
